@@ -20,6 +20,9 @@ SKILLS_DIR="$CLAUDE_DIR/skills"
 CONFIG_FILE="$CLAUDE_DIR/ship.config.json"
 REPO_URL="https://raw.githubusercontent.com/sterlingsky/claude-ship-command/main"
 
+# Expected SHA256 checksums for integrity verification
+SHIP_MD_SHA256="SKIP"  # Set to actual hash in releases, "SKIP" for development
+
 # Arrays for multi-destination support
 declare -a SELECTED_PLATFORMS
 declare -a DEPLOY_COMMANDS
@@ -56,16 +59,59 @@ check_requirements() {
     fi
 }
 
-# Download file with curl or wget
+# Download file with curl or wget (with verification)
 download_file() {
     local url="$1"
     local dest="$2"
+    local expected_hash="${3:-}"
+    local temp_file
+    temp_file=$(mktemp)
 
+    # Download to temp file first
     if command -v curl &> /dev/null; then
-        curl -fsSL "$url" -o "$dest"
+        if ! curl -fsSL "$url" -o "$temp_file" 2>/dev/null; then
+            rm -f "$temp_file"
+            echo -e "${RED}ERROR: Failed to download $url${NC}" >&2
+            return 1
+        fi
     else
-        wget -q "$url" -O "$dest"
+        if ! wget -q "$url" -O "$temp_file" 2>/dev/null; then
+            rm -f "$temp_file"
+            echo -e "${RED}ERROR: Failed to download $url${NC}" >&2
+            return 1
+        fi
     fi
+
+    # Verify file is not empty
+    if [ ! -s "$temp_file" ]; then
+        rm -f "$temp_file"
+        echo -e "${RED}ERROR: Downloaded file is empty${NC}" >&2
+        return 1
+    fi
+
+    # Verify checksum if provided and not "SKIP"
+    if [ -n "$expected_hash" ] && [ "$expected_hash" != "SKIP" ]; then
+        local actual_hash
+        if command -v sha256sum &> /dev/null; then
+            actual_hash=$(sha256sum "$temp_file" | cut -d ' ' -f1)
+        elif command -v shasum &> /dev/null; then
+            actual_hash=$(shasum -a 256 "$temp_file" | cut -d ' ' -f1)
+        else
+            echo -e "${YELLOW}WARNING: Cannot verify checksum (sha256sum/shasum not found)${NC}" >&2
+            actual_hash="$expected_hash"  # Skip verification
+        fi
+
+        if [ "$actual_hash" != "$expected_hash" ]; then
+            rm -f "$temp_file"
+            echo -e "${RED}ERROR: Checksum mismatch - file may be corrupted or tampered${NC}" >&2
+            echo -e "${RED}Expected: $expected_hash${NC}" >&2
+            echo -e "${RED}Actual:   $actual_hash${NC}" >&2
+            return 1
+        fi
+    fi
+
+    # Atomic move to destination
+    mv "$temp_file" "$dest"
 }
 
 # Prompt for selection from list (returns index)
@@ -123,6 +169,18 @@ prompt_input() {
     fi
 
     echo "$value"
+}
+
+# Escape string for JSON (prevents injection)
+json_escape() {
+    local str="$1"
+    # Escape backslashes first, then quotes, then control characters
+    str="${str//\\/\\\\}"
+    str="${str//\"/\\\"}"
+    str="${str//$'\n'/\\n}"
+    str="${str//$'\r'/\\r}"
+    str="${str//$'\t'/\\t}"
+    echo "$str"
 }
 
 # Get platform defaults
@@ -239,17 +297,25 @@ generate_single_config() {
     local deploy_cmd="$4"
     local staging_deploy_cmd="$5"
 
+    # Escape all user inputs for JSON safety
+    local esc_app_url esc_staging_url esc_build_cmd esc_deploy_cmd esc_staging_deploy_cmd
+    esc_app_url=$(json_escape "$app_url")
+    esc_staging_url=$(json_escape "$staging_url")
+    esc_build_cmd=$(json_escape "$build_cmd")
+    esc_deploy_cmd=$(json_escape "$deploy_cmd")
+    esc_staging_deploy_cmd=$(json_escape "$staging_deploy_cmd")
+
     local config='{
   "build": {
-    "command": "'"$build_cmd"'",
+    "command": "'"$esc_build_cmd"'",
     "enabled": true
   },
   "deploy": {
-    "command": "'"$deploy_cmd"'",
+    "command": "'"$esc_deploy_cmd"'",
     "enabled": true
   },
   "verify": {
-    "url": "'"$app_url"'",
+    "url": "'"$esc_app_url"'",
     "enabled": true,
     "retries": 3,
     "retryDelay": 5
@@ -269,13 +335,13 @@ generate_single_config() {
         config="$config"',
   "environments": {
     "production": {
-      "deploy": { "command": "'"$deploy_cmd"'" },
-      "verify": { "url": "'"$app_url"'" },
+      "deploy": { "command": "'"$esc_deploy_cmd"'" },
+      "verify": { "url": "'"$esc_app_url"'" },
       "protectedBranches": ["main", "master"]
     },
     "staging": {
-      "deploy": { "command": "'"$staging_deploy_cmd"'" },
-      "verify": { "url": "'"$staging_url"'" }
+      "deploy": { "command": "'"$esc_staging_deploy_cmd"'" },
+      "verify": { "url": "'"$esc_staging_url"'" }
     }
   },
   "defaultEnvironment": "production"'
@@ -292,23 +358,32 @@ generate_multi_config() {
     local build_cmd="$1"
     local has_staging="$2"
 
-    # Build targets array
+    # Escape build command
+    local esc_build_cmd
+    esc_build_cmd=$(json_escape "$build_cmd")
+
+    # Build targets array with escaped values
     local targets=""
     for i in "${!SELECTED_PLATFORMS[@]}"; do
-        if [ $i -gt 0 ]; then
+        local esc_name esc_cmd esc_url
+        esc_name=$(json_escape "${SELECTED_PLATFORMS[$i]}")
+        esc_cmd=$(json_escape "${DEPLOY_COMMANDS[$i]}")
+        esc_url=$(json_escape "${VERIFY_URLS[$i]}")
+
+        if [ "$i" -gt 0 ]; then
             targets="$targets,"
         fi
         targets="$targets
       {
-        \"name\": \"${SELECTED_PLATFORMS[$i]}\",
-        \"command\": \"${DEPLOY_COMMANDS[$i]}\",
-        \"verify\": \"${VERIFY_URLS[$i]}\"
+        \"name\": \"$esc_name\",
+        \"command\": \"$esc_cmd\",
+        \"verify\": \"$esc_url\"
       }"
     done
 
     local config='{
   "build": {
-    "command": "'"$build_cmd"'",
+    "command": "'"$esc_build_cmd"'",
     "enabled": true
   },
   "deploy": {
@@ -349,7 +424,10 @@ main() {
 
     # Download skill file
     print_step "Step 1/5: Downloading ship.md"
-    download_file "$REPO_URL/ship.md" "$SKILLS_DIR/ship.md"
+    if ! download_file "$REPO_URL/ship.md" "$SKILLS_DIR/ship.md" "$SHIP_MD_SHA256"; then
+        echo -e "${RED}Installation failed: Could not download skill file${NC}"
+        exit 1
+    fi
     echo -e "${GREEN}✓${NC} Downloaded ship.md to $SKILLS_DIR/"
 
     # Check for existing config
@@ -411,7 +489,12 @@ main() {
     "pushUpstream": true
   }
 }'
-        echo "$config" > "$CONFIG_FILE"
+        # Write config atomically with secure permissions
+        local config_temp
+        config_temp=$(mktemp "$CLAUDE_DIR/ship.config.XXXXXX")
+        echo "$config" > "$config_temp"
+        chmod 600 "$config_temp"
+        mv "$config_temp" "$CONFIG_FILE"
         echo -e "${GREEN}✓${NC} Configuration saved to: $CONFIG_FILE"
 
         # Summary
@@ -549,7 +632,12 @@ main() {
         config=$(generate_multi_config "$build_cmd" "false")
     fi
 
-    echo "$config" > "$CONFIG_FILE"
+    # Write config atomically with secure permissions
+    local config_temp
+    config_temp=$(mktemp "$CLAUDE_DIR/ship.config.XXXXXX")
+    echo "$config" > "$config_temp"
+    chmod 600 "$config_temp"
+    mv "$config_temp" "$CONFIG_FILE"
     echo -e "${GREEN}✓${NC} Configuration saved to: $CONFIG_FILE"
 
     # Summary

@@ -9,6 +9,29 @@ $SkillsDir = "$ClaudeDir\skills"
 $ConfigFile = "$ClaudeDir\ship.config.json"
 $RepoUrl = "https://raw.githubusercontent.com/sterlingsky/claude-ship-command/main"
 
+# Expected SHA256 checksums for integrity verification
+$ShipMdSha256 = "SKIP"  # Set to actual hash in releases, "SKIP" for development
+
+function Get-FileChecksum {
+    param([string]$FilePath)
+    $hash = Get-FileHash -Path $FilePath -Algorithm SHA256
+    return $hash.Hash.ToLower()
+}
+
+function Test-DownloadIntegrity {
+    param(
+        [string]$FilePath,
+        [string]$ExpectedHash
+    )
+
+    if ($ExpectedHash -eq "SKIP") {
+        return $true
+    }
+
+    $actualHash = Get-FileChecksum -FilePath $FilePath
+    return $actualHash -eq $ExpectedHash.ToLower()
+}
+
 # Arrays for multi-destination support
 $script:SelectedPlatforms = @()
 $script:DeployCommands = @()
@@ -315,10 +338,27 @@ if (-not (Test-Path $SkillsDir)) {
 # Download skill file
 Write-Step "Step 1/5: Downloading ship.md"
 $ProgressPreference = 'SilentlyContinue'
+$tempFile = [System.IO.Path]::GetTempFileName()
 try {
-    Invoke-WebRequest -Uri "$RepoUrl/ship.md" -OutFile "$SkillsDir\ship.md" -UseBasicParsing
+    Invoke-WebRequest -Uri "$RepoUrl/ship.md" -OutFile $tempFile -UseBasicParsing
+
+    # Verify file is not empty
+    $fileInfo = Get-Item $tempFile
+    if ($fileInfo.Length -eq 0) {
+        throw "Downloaded file is empty"
+    }
+
+    # Verify checksum if provided
+    if (-not (Test-DownloadIntegrity -FilePath $tempFile -ExpectedHash $ShipMdSha256)) {
+        $actualHash = Get-FileChecksum -FilePath $tempFile
+        throw "Checksum mismatch - file may be corrupted or tampered.`nExpected: $ShipMdSha256`nActual: $actualHash"
+    }
+
+    # Atomic move to destination
+    Move-Item -Path $tempFile -Destination "$SkillsDir\ship.md" -Force
     Write-Host "  Downloaded ship.md" -ForegroundColor Green
 } catch {
+    if (Test-Path $tempFile) { Remove-Item $tempFile -Force }
     Write-Host "  Error downloading ship.md: $_" -ForegroundColor Red
     exit 1
 }
@@ -385,7 +425,16 @@ if ($firstPlatform -like "Git only*") {
         }
     } | ConvertTo-Json -Depth 10
 
-    Set-Content -Path $ConfigFile -Value $config -Encoding UTF8
+    # Write config atomically with secure permissions
+    $configTemp = [System.IO.Path]::Combine($ClaudeDir, "ship.config.$([guid]::NewGuid().ToString('N').Substring(0,8)).tmp")
+    Set-Content -Path $configTemp -Value $config -Encoding UTF8
+    # Set file permissions to user-only access
+    $acl = Get-Acl $configTemp
+    $acl.SetAccessRuleProtection($true, $false)
+    $rule = New-Object System.Security.AccessControl.FileSystemAccessRule($env:USERNAME, "FullControl", "Allow")
+    $acl.SetAccessRule($rule)
+    Set-Acl -Path $configTemp -AclObject $acl
+    Move-Item -Path $configTemp -Destination $ConfigFile -Force
     Write-Host "  Configuration saved to: $ConfigFile" -ForegroundColor Green
 
     # Summary
@@ -526,7 +575,16 @@ if ($script:SelectedPlatforms.Count -eq 1) {
     $config = New-MultiConfig -BuildCmd $buildCmd
 }
 
-Set-Content -Path $ConfigFile -Value $config -Encoding UTF8
+# Write config atomically with secure permissions
+$configTemp = [System.IO.Path]::Combine($ClaudeDir, "ship.config.$([guid]::NewGuid().ToString('N').Substring(0,8)).tmp")
+Set-Content -Path $configTemp -Value $config -Encoding UTF8
+# Set file permissions to user-only access
+$acl = Get-Acl $configTemp
+$acl.SetAccessRuleProtection($true, $false)
+$rule = New-Object System.Security.AccessControl.FileSystemAccessRule($env:USERNAME, "FullControl", "Allow")
+$acl.SetAccessRule($rule)
+Set-Acl -Path $configTemp -AclObject $acl
+Move-Item -Path $configTemp -Destination $ConfigFile -Force
 Write-Host "  Configuration saved to: $ConfigFile" -ForegroundColor Green
 
 # Summary
