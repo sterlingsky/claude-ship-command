@@ -213,6 +213,7 @@ main() {
 
     platforms=(
         "Firebase (Hosting + Functions)"
+        "Google Cloud Run"
         "Vercel"
         "Netlify"
         "Cloudflare Pages"
@@ -240,6 +241,13 @@ main() {
             staging_deploy_cmd="firebase deploy --only functions,hosting --project staging"
             url_example="https://your-app.web.app"
             staging_example="https://your-app-staging.web.app"
+            ;;
+        "Google Cloud Run")
+            build_cmd="gcloud builds submit --tag \$REGION-docker.pkg.dev/\$PROJECT_ID/\$REPO_NAME/your-app:\$(git rev-parse --short HEAD)"
+            deploy_cmd="gcloud run deploy your-app --image \$REGION-docker.pkg.dev/\$PROJECT_ID/\$REPO_NAME/your-app:\$(git rev-parse --short HEAD) --platform managed --region \$REGION --allow-unauthenticated"
+            staging_deploy_cmd="gcloud run deploy your-app-staging --image \$REGION-docker.pkg.dev/\$PROJECT_ID/\$REPO_NAME/your-app:\$(git rev-parse --short HEAD) --platform managed --region \$REGION --allow-unauthenticated"
+            url_example="https://your-app-xxxxx-uc.a.run.app"
+            staging_example="https://your-app-staging-xxxxx-uc.a.run.app"
             ;;
         "Vercel")
             build_cmd="npm run build"

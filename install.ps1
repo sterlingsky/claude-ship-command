@@ -178,6 +178,7 @@ Write-Step "Step 2/4: Select Your Platform"
 
 $platforms = @(
     "Firebase (Hosting + Functions)",
+    "Google Cloud Run",
     "Vercel",
     "Netlify",
     "Cloudflare Pages",
@@ -206,6 +207,13 @@ switch -Wildcard ($platform) {
         $stagingDeployCmd = "firebase deploy --only functions,hosting --project staging"
         $urlExample = "https://your-app.web.app"
         $stagingExample = "https://your-app-staging.web.app"
+    }
+    "Google Cloud Run" {
+        $buildCmd = "gcloud builds submit --tag `$REGION-docker.pkg.dev/`$PROJECT_ID/`$REPO_NAME/your-app:`$(git rev-parse --short HEAD)"
+        $deployCmd = "gcloud run deploy your-app --image `$REGION-docker.pkg.dev/`$PROJECT_ID/`$REPO_NAME/your-app:`$(git rev-parse --short HEAD) --platform managed --region `$REGION --allow-unauthenticated"
+        $stagingDeployCmd = "gcloud run deploy your-app-staging --image `$REGION-docker.pkg.dev/`$PROJECT_ID/`$REPO_NAME/your-app:`$(git rev-parse --short HEAD) --platform managed --region `$REGION --allow-unauthenticated"
+        $urlExample = "https://your-app-xxxxx-uc.a.run.app"
+        $stagingExample = "https://your-app-staging-xxxxx-uc.a.run.app"
     }
     "Vercel" {
         $buildCmd = "npm run build"

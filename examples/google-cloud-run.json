@@ -1,0 +1,34 @@
+{
+  "$schema": "../ship.config.schema.json",
+  "_comment": "Google Cloud Run deployment with Artifact Registry",
+  "build": {
+    "command": "gcloud builds submit --tag $REGION-docker.pkg.dev/$PROJECT_ID/$REPO_NAME/your-app:$TAG",
+    "enabled": true
+  },
+  "deploy": {
+    "command": "gcloud run deploy your-app --image $REGION-docker.pkg.dev/$PROJECT_ID/$REPO_NAME/your-app:$TAG --platform managed --region $REGION --allow-unauthenticated",
+    "enabled": true
+  },
+  "verify": {
+    "url": "https://your-app-xxxxx-uc.a.run.app/",
+    "enabled": true,
+    "retries": 5,
+    "retryDelay": 10
+  },
+  "hooks": {
+    "preBuild": "export TAG=$(git rev-parse --short HEAD) && export REGION=us-central1 && export REPO_NAME=cloud-run-source-deploy",
+    "postDeploy": null
+  },
+  "environments": {
+    "production": {
+      "deploy": { "command": "gcloud run deploy your-app --image $REGION-docker.pkg.dev/$PROJECT_ID/$REPO_NAME/your-app:$TAG --platform managed --region $REGION --allow-unauthenticated" },
+      "verify": { "url": "https://your-app-xxxxx-uc.a.run.app/" },
+      "protectedBranches": ["main"]
+    },
+    "staging": {
+      "deploy": { "command": "gcloud run deploy your-app-staging --image $REGION-docker.pkg.dev/$PROJECT_ID/$REPO_NAME/your-app:$TAG --platform managed --region $REGION --allow-unauthenticated" },
+      "verify": { "url": "https://your-app-staging-xxxxx-uc.a.run.app/" }
+    }
+  },
+  "defaultEnvironment": "production"
+}

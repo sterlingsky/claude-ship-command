@@ -1,0 +1,73 @@
+{
+  "$schema": "../ship.config.schema.json",
+  "_comment": "Multi-destination deployment - Firebase + Google Cloud Run (Artifact Registry)",
+  "build": {
+    "command": "npm run build && gcloud builds submit --tag $REGION-docker.pkg.dev/$PROJECT_ID/$REPO_NAME/your-app:$(git rev-parse --short HEAD)",
+    "enabled": true
+  },
+  "deploy": {
+    "targets": [
+      {
+        "name": "Firebase",
+        "command": "firebase deploy --only functions,hosting",
+        "verify": "https://your-app.web.app/"
+      },
+      {
+        "name": "Cloud Run",
+        "command": "gcloud run deploy your-app --image $REGION-docker.pkg.dev/$PROJECT_ID/$REPO_NAME/your-app:$(git rev-parse --short HEAD) --platform managed --region $REGION --allow-unauthenticated",
+        "verify": "https://your-app-xxxxx-uc.a.run.app/"
+      }
+    ],
+    "parallel": false,
+    "stopOnFailure": true,
+    "enabled": true
+  },
+  "verify": {
+    "enabled": true,
+    "retries": 3,
+    "retryDelay": 5
+  },
+  "git": {
+    "addAll": true,
+    "pushUpstream": true
+  },
+  "hooks": {
+    "preBuild": "export REGION=us-central1 && export REPO_NAME=cloud-run-source-deploy"
+  },
+  "environments": {
+    "production": {
+      "deploy": {
+        "targets": [
+          {
+            "name": "Firebase",
+            "command": "firebase deploy --only functions,hosting",
+            "verify": "https://your-app.web.app/"
+          },
+          {
+            "name": "Cloud Run",
+            "command": "gcloud run deploy your-app --image $REGION-docker.pkg.dev/$PROJECT_ID/$REPO_NAME/your-app:$(git rev-parse --short HEAD) --platform managed --region $REGION --allow-unauthenticated",
+            "verify": "https://your-app-xxxxx-uc.a.run.app/"
+          }
+        ]
+      },
+      "protectedBranches": ["main"]
+    },
+    "staging": {
+      "deploy": {
+        "targets": [
+          {
+            "name": "Firebase Staging",
+            "command": "firebase deploy --only functions,hosting --project staging",
+            "verify": "https://your-app-staging.web.app/"
+          },
+          {
+            "name": "Cloud Run Staging",
+            "command": "gcloud run deploy your-app-staging --image $REGION-docker.pkg.dev/$PROJECT_ID/$REPO_NAME/your-app:$(git rev-parse --short HEAD) --platform managed --region $REGION --allow-unauthenticated",
+            "verify": "https://your-app-staging-xxxxx-uc.a.run.app/"
+          }
+        ]
+      }
+    }
+  },
+  "defaultEnvironment": "production"
+}

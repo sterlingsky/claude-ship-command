@@ -70,6 +70,37 @@ Look for config in this order (first found wins):
 }
 ```
 
+### Multi-Destination Configuration
+
+Deploy to multiple targets (e.g., Firebase + Cloud Run) with a single `/ship`:
+
+```json
+{
+  "deploy": {
+    "targets": [
+      {
+        "name": "Firebase",
+        "command": "firebase deploy --only functions,hosting",
+        "verify": "https://your-app.web.app/"
+      },
+      {
+        "name": "Cloud Run",
+        "command": "gcloud run deploy your-app --image $REGION-docker.pkg.dev/$PROJECT_ID/$REPO/app:$(git rev-parse --short HEAD) --platform managed --region $REGION",
+        "verify": "https://your-app-xxxxx-uc.a.run.app/"
+      }
+    ],
+    "parallel": false,
+    "stopOnFailure": true,
+    "enabled": true
+  }
+}
+```
+
+Multi-destination options:
+- `targets[]` - Array of deployment targets with name, command, and verify URL
+- `parallel` - Run targets simultaneously (default: false for sequential)
+- `stopOnFailure` - Stop remaining targets if one fails (default: true)
+
 ## Workflow
 
 Execute each step sequentially. **Stop immediately if any step fails** (unless in dry-run mode).
@@ -202,19 +233,31 @@ Step 4/6: Build ✅
 Skip if:
 - `--no-deploy` flag is set
 - `deploy.enabled` is false
-- `deploy.command` is null
+- `deploy.command` is null AND `deploy.targets` is empty
 
 1. Run pre-deploy hook if configured:
    ```bash
    {config.hooks.preDeploy}
    ```
 
-2. Get the deploy command (check environment-specific config first):
+2. **Single-destination deploy:**
+   If `deploy.command` is set (not using targets array):
    ```bash
    {environments[env].deploy.command || config.deploy.command}
    ```
 
-3. Run post-deploy hook if configured:
+3. **Multi-destination deploy:**
+   If `deploy.targets` array is configured:
+   - Loop through each target in the array
+   - For each target, run its command:
+     ```bash
+     {target.command}
+     ```
+   - Report success/failure for each target by name
+   - If `stopOnFailure` is true (default), stop on first failure
+   - If `parallel` is true, run all targets simultaneously
+
+4. Run post-deploy hook if configured:
    ```bash
    {config.hooks.postDeploy}
    ```

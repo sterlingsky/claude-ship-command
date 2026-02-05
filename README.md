@@ -24,6 +24,7 @@ A powerful `/ship` skill for [Claude Code](https://claude.ai/claude-code) that a
 | Firebase | [`examples/firebase.json`](examples/firebase.json) |
 | Vercel | [`examples/vercel.json`](examples/vercel.json) |
 | Netlify | [`examples/netlify.json`](examples/netlify.json) |
+| Google Cloud Run | [`examples/google-cloud-run.json`](examples/google-cloud-run.json) |
 | AWS Amplify | [`examples/aws-amplify.json`](examples/aws-amplify.json) |
 | AWS S3 + CloudFront | [`examples/aws-s3-cloudfront.json`](examples/aws-s3-cloudfront.json) |
 | Cloudflare Pages | [`examples/cloudflare-pages.json`](examples/cloudflare-pages.json) |
@@ -34,6 +35,7 @@ A powerful `/ship` skill for [Claude Code](https://claude.ai/claude-code) that a
 | Fly.io | [`examples/fly-io.json`](examples/fly-io.json) |
 | Railway | [`examples/railway.json`](examples/railway.json) |
 | Render | [`examples/render.json`](examples/render.json) |
+| **Multi-destination** | [`examples/multi-destination.json`](examples/multi-destination.json) |
 | Git only (no deploy) | [`examples/git-only.json`](examples/git-only.json) |
 
 ## Quick Start
@@ -231,6 +233,46 @@ Usage:
 /ship --env=staging "feat: new feature"
 /ship --env=production --force "hotfix: critical bug"
 ```
+
+## Multi-Destination Deployment
+
+Deploy to multiple targets (e.g., Firebase + Cloud Run) with a single `/ship`:
+
+```json
+{
+  "deploy": {
+    "targets": [
+      {
+        "name": "Firebase",
+        "command": "firebase deploy --only functions,hosting",
+        "verify": "https://your-app.web.app/"
+      },
+      {
+        "name": "Cloud Run",
+        "command": "gcloud run deploy your-app --image $REGION-docker.pkg.dev/$PROJECT_ID/$REPO/app --platform managed --region $REGION",
+        "verify": "https://your-app-xxxxx-uc.a.run.app/"
+      }
+    ],
+    "parallel": false,
+    "stopOnFailure": true,
+    "enabled": true
+  }
+}
+```
+
+Output shows each target:
+```
+Step 5/6: Deploy
+  → Firebase ✅
+  → Cloud Run ✅
+```
+
+Options:
+- `targets[]` - Array of deployment targets
+- `parallel` - Run targets simultaneously (default: false)
+- `stopOnFailure` - Stop remaining targets if one fails (default: true)
+
+See [`examples/multi-destination.json`](examples/multi-destination.json) for a complete Firebase + Cloud Run example.
 
 ## Pre/Post Hooks
 
