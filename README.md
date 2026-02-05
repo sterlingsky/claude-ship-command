@@ -27,11 +27,11 @@ Run the installer and answer a few questions — no manual config editing requir
 ║        Claude Ship Command - Interactive Setup             ║
 ╚════════════════════════════════════════════════════════════╝
 
-━━━ Step 1/4: Downloading ship.md ━━━
+━━━ Step 1/5: Downloading ship.md ━━━
 
 ✓ Downloaded ship.md to ~/.claude/skills/
 
-━━━ Step 2/4: Select Your Platform ━━━
+━━━ Step 2/5: Select Your Platform(s) ━━━
 
 Which platform do you deploy to?
 
@@ -56,24 +56,44 @@ Enter number (1-16): 1
 
 ✓ Selected: Firebase (Hosting + Functions)
 
-━━━ Step 3/4: Configure Your URLs ━━━
+Do you want to deploy to additional destinations? [y/N]: y
 
-What is your production URL?
-Example: https://your-app.web.app
-Production URL [https://your-app.web.app]: https://myapp.web.app
+Currently selected:
+  • Firebase (Hosting + Functions)
 
-Do you have a staging environment? [y/N]: y
+Select another platform:
 
-Example: https://your-app-staging.web.app
-Staging URL [https://your-app-staging.web.app]: https://myapp-staging.web.app
+  1) Google Cloud Run
+  2) Vercel
+  3) Netlify
+  ...
+
+Enter number (1-14): 1
+
+✓ Added: Google Cloud Run
+
+Add another destination? [y/N]: n
+
+━━━ Step 3/5: Configure Your Destinations ━━━
+
+[1/2] Firebase (Hosting + Functions)
+Example URL: https://your-app.web.app
+Verify URL [https://your-app.web.app]: https://myapp.web.app
+Default command: firebase deploy --only functions,hosting
+Customize deploy command? [y/N]: n
+
+[2/2] Google Cloud Run
+Example URL: https://your-app-xxxxx-uc.a.run.app
+Verify URL [https://your-app-xxxxx-uc.a.run.app]: https://myapp-api-abc123-uc.a.run.app
+Default command: gcloud run deploy your-app --image ...
+Customize deploy command? [y/N]: n
+
+━━━ Step 4/5: Build Configuration ━━━
 
 Build command: npm run build
 Would you like to customize it? [y/N]: n
 
-Deploy command: firebase deploy --only functions,hosting
-Would you like to customize it? [y/N]: n
-
-━━━ Step 4/4: Saving Configuration ━━━
+━━━ Step 5/5: Saving Configuration ━━━
 
 ✓ Configuration saved to: ~/.claude/ship.config.json
 
@@ -86,14 +106,13 @@ Files installed:
   Config: ~/.claude/ship.config.json
 
 Your configuration:
-  Platform: Firebase (Hosting + Functions)
-  URL: https://myapp.web.app
-  Staging: https://myapp-staging.web.app
+  Destinations:
+    • Firebase (Hosting + Functions): https://myapp.web.app
+    • Google Cloud Run: https://myapp-api-abc123-uc.a.run.app
 
 Usage:
   /ship                    # Auto commit, push, build, deploy
   /ship "feat: feature"    # Custom commit message
-  /ship --env=staging      # Deploy to staging
   /ship --dry-run          # Preview without executing
   /ship --no-deploy        # Commit and push only
 
@@ -101,9 +120,10 @@ Open Claude Code and type /ship to get started!
 ```
 
 The installer automatically:
+- **Supports multiple destinations** — deploy to Firebase + Cloud Run (or any combination) in one command
 - Detects your platform and suggests appropriate commands
 - Pre-fills URLs with sensible defaults
-- Configures staging environments if needed
+- Configures staging environments (for single-destination setups)
 - Sets up build and deploy commands for your platform
 
 ## Supported Cloud Destinations

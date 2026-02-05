@@ -9,6 +9,11 @@ $SkillsDir = "$ClaudeDir\skills"
 $ConfigFile = "$ClaudeDir\ship.config.json"
 $RepoUrl = "https://raw.githubusercontent.com/sterlingsky/claude-ship-command/main"
 
+# Arrays for multi-destination support
+$script:SelectedPlatforms = @()
+$script:DeployCommands = @()
+$script:VerifyUrls = @()
+
 function Write-Header {
     Write-Host ""
     Write-Host "================================================================" -ForegroundColor Blue
@@ -24,7 +29,7 @@ function Write-Step {
     Write-Host ""
 }
 
-function Select-Option {
+function Select-OptionIndex {
     param(
         [string]$Prompt,
         [string[]]$Options
@@ -42,7 +47,7 @@ function Select-Option {
         $choice = Read-Host "Enter number (1-$($Options.Count))"
         $num = 0
         if ([int]::TryParse($choice, [ref]$num) -and $num -ge 1 -and $num -le $Options.Count) {
-            return $Options[$num - 1]
+            return $num - 1
         }
         Write-Host "Invalid choice. Please enter a number between 1 and $($Options.Count)." -ForegroundColor Red
     } while ($true)
@@ -84,9 +89,123 @@ function Get-Input {
     }
 }
 
-function New-Config {
+function Get-PlatformDefaults {
+    param([string]$Platform)
+
+    $defaults = @{
+        Build = ""
+        Deploy = ""
+        StagingDeploy = ""
+        Url = ""
+        StagingUrl = ""
+    }
+
+    switch -Wildcard ($Platform) {
+        "Firebase (Hosting + Functions)" {
+            $defaults.Build = "npm run build"
+            $defaults.Deploy = "firebase deploy --only functions,hosting"
+            $defaults.StagingDeploy = "firebase deploy --only functions,hosting --project staging"
+            $defaults.Url = "https://your-app.web.app"
+            $defaults.StagingUrl = "https://your-app-staging.web.app"
+        }
+        "Google Cloud Run" {
+            $defaults.Build = "gcloud builds submit --tag `$REGION-docker.pkg.dev/`$PROJECT_ID/`$REPO_NAME/your-app:`$(git rev-parse --short HEAD)"
+            $defaults.Deploy = "gcloud run deploy your-app --image `$REGION-docker.pkg.dev/`$PROJECT_ID/`$REPO_NAME/your-app:`$(git rev-parse --short HEAD) --platform managed --region `$REGION --allow-unauthenticated"
+            $defaults.StagingDeploy = "gcloud run deploy your-app-staging --image `$REGION-docker.pkg.dev/`$PROJECT_ID/`$REPO_NAME/your-app:`$(git rev-parse --short HEAD) --platform managed --region `$REGION --allow-unauthenticated"
+            $defaults.Url = "https://your-app-xxxxx-uc.a.run.app"
+            $defaults.StagingUrl = "https://your-app-staging-xxxxx-uc.a.run.app"
+        }
+        "Vercel" {
+            $defaults.Build = "npm run build"
+            $defaults.Deploy = "vercel --prod"
+            $defaults.StagingDeploy = "vercel"
+            $defaults.Url = "https://your-app.vercel.app"
+            $defaults.StagingUrl = ""
+        }
+        "Netlify" {
+            $defaults.Build = "npm run build"
+            $defaults.Deploy = "netlify deploy --prod --dir=dist"
+            $defaults.StagingDeploy = "netlify deploy --dir=dist"
+            $defaults.Url = "https://your-app.netlify.app"
+            $defaults.StagingUrl = ""
+        }
+        "Cloudflare Pages" {
+            $defaults.Build = "npm run build"
+            $defaults.Deploy = "wrangler pages deploy dist --project-name=your-app"
+            $defaults.StagingDeploy = "wrangler pages deploy dist --project-name=your-app-staging"
+            $defaults.Url = "https://your-app.pages.dev"
+            $defaults.StagingUrl = ""
+        }
+        "AWS Amplify" {
+            $defaults.Build = "npm run build"
+            $defaults.Deploy = "amplify publish --yes"
+            $defaults.StagingDeploy = "amplify publish --yes --envName dev"
+            $defaults.Url = "https://main.your-app-id.amplifyapp.com"
+            $defaults.StagingUrl = "https://dev.your-app-id.amplifyapp.com"
+        }
+        "AWS S3 + CloudFront" {
+            $defaults.Build = "npm run build"
+            $defaults.Deploy = "aws s3 sync dist/ s3://your-bucket --delete"
+            $defaults.StagingDeploy = "aws s3 sync dist/ s3://your-bucket-staging --delete"
+            $defaults.Url = "https://your-cloudfront-domain.cloudfront.net"
+            $defaults.StagingUrl = ""
+        }
+        "Azure Static Web Apps" {
+            $defaults.Build = "npm run build"
+            $defaults.Deploy = "swa deploy ./dist"
+            $defaults.StagingDeploy = "swa deploy ./dist --env preview"
+            $defaults.Url = "https://your-app.azurestaticapps.net"
+            $defaults.StagingUrl = ""
+        }
+        "GitHub Pages" {
+            $defaults.Build = "npm run build"
+            $defaults.Deploy = "npx gh-pages -d dist"
+            $defaults.StagingDeploy = ""
+            $defaults.Url = "https://your-username.github.io/your-repo"
+            $defaults.StagingUrl = ""
+        }
+        "Docker + Kubernetes" {
+            $defaults.Build = "docker build -t your-app:latest ."
+            $defaults.Deploy = "kubectl apply -f k8s/"
+            $defaults.StagingDeploy = "kubectl apply -f k8s/ --context staging"
+            $defaults.Url = "https://your-app.your-cluster.com"
+            $defaults.StagingUrl = "https://staging.your-app.your-cluster.com"
+        }
+        "Heroku" {
+            $defaults.Build = ""
+            $defaults.Deploy = "git push heroku HEAD:main"
+            $defaults.StagingDeploy = "git push heroku-staging HEAD:main"
+            $defaults.Url = "https://your-app.herokuapp.com"
+            $defaults.StagingUrl = "https://your-app-staging.herokuapp.com"
+        }
+        "Fly.io" {
+            $defaults.Build = ""
+            $defaults.Deploy = "fly deploy"
+            $defaults.StagingDeploy = "fly deploy --app your-app-staging"
+            $defaults.Url = "https://your-app.fly.dev"
+            $defaults.StagingUrl = "https://your-app-staging.fly.dev"
+        }
+        "Railway" {
+            $defaults.Build = ""
+            $defaults.Deploy = "railway up"
+            $defaults.StagingDeploy = "railway up --environment staging"
+            $defaults.Url = "https://your-app.railway.app"
+            $defaults.StagingUrl = "https://your-app-staging.railway.app"
+        }
+        "Render" {
+            $defaults.Build = "npm run build"
+            $defaults.Deploy = "# Render auto-deploys from git"
+            $defaults.StagingDeploy = ""
+            $defaults.Url = "https://your-app.onrender.com"
+            $defaults.StagingUrl = ""
+        }
+    }
+
+    return $defaults
+}
+
+function New-SingleConfig {
     param(
-        [string]$Platform,
         [string]$AppUrl,
         [string]$StagingUrl,
         [string]$BuildCmd,
@@ -139,6 +258,52 @@ function New-Config {
     return $config | ConvertTo-Json -Depth 10
 }
 
+function New-MultiConfig {
+    param(
+        [string]$BuildCmd
+    )
+
+    $targets = @()
+    for ($i = 0; $i -lt $script:SelectedPlatforms.Count; $i++) {
+        $targets += @{
+            name = $script:SelectedPlatforms[$i]
+            command = $script:DeployCommands[$i]
+            verify = $script:VerifyUrls[$i]
+        }
+    }
+
+    $config = @{
+        build = @{
+            command = $BuildCmd
+            enabled = $true
+        }
+        deploy = @{
+            targets = $targets
+            parallel = $false
+            stopOnFailure = $true
+            enabled = $true
+        }
+        verify = @{
+            enabled = $true
+            retries = 3
+            retryDelay = 5
+        }
+        git = @{
+            addAll = $true
+            pushUpstream = $true
+        }
+        hooks = @{
+            preBuild = $null
+            postBuild = $null
+            preDeploy = $null
+            postDeploy = $null
+        }
+        defaultEnvironment = "production"
+    }
+
+    return $config | ConvertTo-Json -Depth 10
+}
+
 # Main installation
 Write-Header
 
@@ -148,7 +313,7 @@ if (-not (Test-Path $SkillsDir)) {
 }
 
 # Download skill file
-Write-Step "Step 1/4: Downloading ship.md"
+Write-Step "Step 1/5: Downloading ship.md"
 $ProgressPreference = 'SilentlyContinue'
 try {
     Invoke-WebRequest -Uri "$RepoUrl/ship.md" -OutFile "$SkillsDir\ship.md" -UseBasicParsing
@@ -174,7 +339,7 @@ if (Test-Path $ConfigFile) {
 }
 
 # Platform selection
-Write-Step "Step 2/4: Select Your Platform"
+Write-Step "Step 2/5: Select Your Platform(s)"
 
 $platforms = @(
     "Firebase (Hosting + Functions)",
@@ -195,185 +360,173 @@ $platforms = @(
     "Custom (I'll configure manually)"
 )
 
-$platform = Select-Option "Which platform do you deploy to?" $platforms
+$selectedIndex = Select-OptionIndex "Which platform do you deploy to?" $platforms
+$firstPlatform = $platforms[$selectedIndex]
 Write-Host ""
-Write-Host "  Selected: $platform" -ForegroundColor Green
+Write-Host "  Selected: $firstPlatform" -ForegroundColor Green
 
-# Set defaults based on platform
-switch -Wildcard ($platform) {
-    "Firebase*" {
-        $buildCmd = "npm run build"
-        $deployCmd = "firebase deploy --only functions,hosting"
-        $stagingDeployCmd = "firebase deploy --only functions,hosting --project staging"
-        $urlExample = "https://your-app.web.app"
-        $stagingExample = "https://your-app-staging.web.app"
-    }
-    "Google Cloud Run" {
-        $buildCmd = "gcloud builds submit --tag `$REGION-docker.pkg.dev/`$PROJECT_ID/`$REPO_NAME/your-app:`$(git rev-parse --short HEAD)"
-        $deployCmd = "gcloud run deploy your-app --image `$REGION-docker.pkg.dev/`$PROJECT_ID/`$REPO_NAME/your-app:`$(git rev-parse --short HEAD) --platform managed --region `$REGION --allow-unauthenticated"
-        $stagingDeployCmd = "gcloud run deploy your-app-staging --image `$REGION-docker.pkg.dev/`$PROJECT_ID/`$REPO_NAME/your-app:`$(git rev-parse --short HEAD) --platform managed --region `$REGION --allow-unauthenticated"
-        $urlExample = "https://your-app-xxxxx-uc.a.run.app"
-        $stagingExample = "https://your-app-staging-xxxxx-uc.a.run.app"
-    }
-    "Vercel" {
-        $buildCmd = "npm run build"
-        $deployCmd = "vercel --prod"
-        $stagingDeployCmd = "vercel"
-        $urlExample = "https://your-app.vercel.app"
-        $stagingExample = ""
-    }
-    "Netlify" {
-        $buildCmd = "npm run build"
-        $deployCmd = "netlify deploy --prod --dir=dist"
-        $stagingDeployCmd = "netlify deploy --dir=dist"
-        $urlExample = "https://your-app.netlify.app"
-        $stagingExample = ""
-    }
-    "Cloudflare*" {
-        $buildCmd = "npm run build"
-        $deployCmd = "wrangler pages deploy dist --project-name=your-app"
-        $stagingDeployCmd = "wrangler pages deploy dist --project-name=your-app-staging"
-        $urlExample = "https://your-app.pages.dev"
-        $stagingExample = ""
-    }
-    "AWS Amplify" {
-        $buildCmd = "npm run build"
-        $deployCmd = "amplify publish --yes"
-        $stagingDeployCmd = "amplify publish --yes --envName dev"
-        $urlExample = "https://main.your-app-id.amplifyapp.com"
-        $stagingExample = "https://dev.your-app-id.amplifyapp.com"
-    }
-    "AWS S3*" {
-        $buildCmd = "npm run build"
-        $deployCmd = "aws s3 sync dist/ s3://your-bucket --delete"
-        $stagingDeployCmd = "aws s3 sync dist/ s3://your-bucket-staging --delete"
-        $urlExample = "https://your-cloudfront-domain.cloudfront.net"
-        $stagingExample = ""
-    }
-    "Azure*" {
-        $buildCmd = "npm run build"
-        $deployCmd = "swa deploy ./dist"
-        $stagingDeployCmd = "swa deploy ./dist --env preview"
-        $urlExample = "https://your-app.azurestaticapps.net"
-        $stagingExample = ""
-    }
-    "GitHub*" {
-        $buildCmd = "npm run build"
-        $deployCmd = "npx gh-pages -d dist"
-        $stagingDeployCmd = ""
-        $urlExample = "https://your-username.github.io/your-repo"
-        $stagingExample = ""
-    }
-    "Docker*" {
-        $buildCmd = "docker build -t your-app:latest ."
-        $deployCmd = "kubectl apply -f k8s/"
-        $stagingDeployCmd = "kubectl apply -f k8s/ --context staging"
-        $urlExample = "https://your-app.your-cluster.com"
-        $stagingExample = "https://staging.your-app.your-cluster.com"
-    }
-    "Heroku" {
-        $buildCmd = ""
-        $deployCmd = "git push heroku HEAD:main"
-        $stagingDeployCmd = "git push heroku-staging HEAD:main"
-        $urlExample = "https://your-app.herokuapp.com"
-        $stagingExample = "https://your-app-staging.herokuapp.com"
-    }
-    "Fly.io" {
-        $buildCmd = ""
-        $deployCmd = "fly deploy"
-        $stagingDeployCmd = "fly deploy --app your-app-staging"
-        $urlExample = "https://your-app.fly.dev"
-        $stagingExample = "https://your-app-staging.fly.dev"
-    }
-    "Railway" {
-        $buildCmd = ""
-        $deployCmd = "railway up"
-        $stagingDeployCmd = "railway up --environment staging"
-        $urlExample = "https://your-app.railway.app"
-        $stagingExample = "https://your-app-staging.railway.app"
-    }
-    "Render" {
-        $buildCmd = "npm run build"
-        $deployCmd = "# Render auto-deploys from git"
-        $stagingDeployCmd = ""
-        $urlExample = "https://your-app.onrender.com"
-        $stagingExample = ""
-    }
-    "Git only*" {
-        $buildCmd = ""
-        $deployCmd = ""
-        $stagingDeployCmd = ""
-        $urlExample = ""
-        $stagingExample = ""
-    }
-    "Custom*" {
-        $buildCmd = "npm run build"
-        $deployCmd = ""
-        $stagingDeployCmd = ""
-        $urlExample = ""
-        $stagingExample = ""
+# Check for git-only
+if ($firstPlatform -like "Git only*") {
+    Write-Step "Step 3/5: Configuration"
+    Write-Host "Git-only mode selected. No deploy or verify configuration needed."
+
+    Write-Step "Step 4/5: Saving Configuration"
+    $config = @{
+        build = @{
+            command = ""
+            enabled = $false
+        }
+        deploy = @{
+            enabled = $false
+        }
+        git = @{
+            addAll = $true
+            pushUpstream = $true
+        }
+    } | ConvertTo-Json -Depth 10
+
+    Set-Content -Path $ConfigFile -Value $config -Encoding UTF8
+    Write-Host "  Configuration saved to: $ConfigFile" -ForegroundColor Green
+
+    # Summary
+    Write-Host ""
+    Write-Host "================================================================" -ForegroundColor Green
+    Write-Host "               Installation Complete!                           " -ForegroundColor White
+    Write-Host "================================================================" -ForegroundColor Green
+    Write-Host ""
+    Write-Host "Files installed:" -ForegroundColor White
+    Write-Host "  Skill:  $SkillsDir\ship.md"
+    Write-Host "  Config: $ConfigFile"
+    Write-Host ""
+    Write-Host "Usage:" -ForegroundColor White
+    Write-Host '  /ship                    # Auto commit and push'
+    Write-Host '  /ship "feat: feature"    # Custom commit message'
+    Write-Host ""
+    Write-Host "Open Claude Code and type /ship to get started!" -ForegroundColor Cyan
+    Write-Host ""
+    exit 0
+}
+
+# Store first platform
+$script:SelectedPlatforms += $firstPlatform
+$defaults = Get-PlatformDefaults $firstPlatform
+$script:DeployCommands += $defaults.Deploy
+$script:VerifyUrls += $defaults.Url
+$buildCmd = $defaults.Build
+
+# Ask about additional destinations
+Write-Host ""
+$multiDest = $false
+if (Get-Confirmation "Do you want to deploy to additional destinations?" $false) {
+    $multiDest = $true
+
+    while ($true) {
+        # Filter out already selected platforms and special options
+        $availablePlatforms = @()
+        foreach ($p in $platforms) {
+            if ($p -notlike "Git only*" -and $p -notlike "Custom*") {
+                $alreadySelected = $false
+                foreach ($selected in $script:SelectedPlatforms) {
+                    if ($p -eq $selected) {
+                        $alreadySelected = $true
+                        break
+                    }
+                }
+                if (-not $alreadySelected) {
+                    $availablePlatforms += $p
+                }
+            }
+        }
+
+        if ($availablePlatforms.Count -eq 0) {
+            Write-Host "No more platforms available." -ForegroundColor Yellow
+            break
+        }
+
+        Write-Host ""
+        Write-Host "Currently selected:" -ForegroundColor White
+        foreach ($p in $script:SelectedPlatforms) {
+            Write-Host "  * $p"
+        }
+        Write-Host ""
+
+        $selectedIndex = Select-OptionIndex "Select another platform:" $availablePlatforms
+        $additionalPlatform = $availablePlatforms[$selectedIndex]
+        Write-Host ""
+        Write-Host "  Added: $additionalPlatform" -ForegroundColor Green
+
+        $script:SelectedPlatforms += $additionalPlatform
+        $defaults = Get-PlatformDefaults $additionalPlatform
+        $script:DeployCommands += $defaults.Deploy
+        $script:VerifyUrls += $defaults.Url
+
+        Write-Host ""
+        if (-not (Get-Confirmation "Add another destination?" $false)) {
+            break
+        }
     }
 }
 
-# Git-only mode
-if ($platform -like "Git only*") {
-    Write-Step "Step 3/4: Configuration"
-    Write-Host "Git-only mode selected. No deploy or verify configuration needed."
-    $appUrl = ""
-    $stagingUrl = "none"
-} else {
-    Write-Step "Step 3/4: Configure Your URLs"
+# Configure URLs for each destination
+Write-Step "Step 3/5: Configure Your Destinations"
 
-    # Production URL
-    if ($urlExample) {
-        Write-Host "What is your production URL?" -ForegroundColor Yellow
-        Write-Host "Example: $urlExample"
-    }
-    $appUrl = Get-Input "Production URL" $urlExample
-
-    # Staging
+for ($i = 0; $i -lt $script:SelectedPlatforms.Count; $i++) {
+    $platform = $script:SelectedPlatforms[$i]
     Write-Host ""
-    if (Get-Confirmation "Do you have a staging environment?" $false) {
-        if ($stagingExample) {
-            Write-Host ""
-            Write-Host "Example: $stagingExample"
-        }
-        $stagingUrl = Get-Input "Staging URL" $stagingExample
-    } else {
-        $stagingUrl = "none"
+    Write-Host "[$($i + 1)/$($script:SelectedPlatforms.Count)] $platform" -ForegroundColor White
+
+    $defaults = Get-PlatformDefaults $platform
+
+    # Verify URL
+    Write-Host "Example URL: $($defaults.Url)"
+    $url = Get-Input "Verify URL" $defaults.Url
+    $script:VerifyUrls[$i] = $url
+
+    # Deploy command
+    Write-Host "Default command: $($defaults.Deploy)"
+    if (Get-Confirmation "Customize deploy command?" $false) {
+        $cmd = Get-Input "Deploy command" $defaults.Deploy
+        $script:DeployCommands[$i] = $cmd
     }
 }
 
 # Build command
-if ($platform -notlike "Git only*") {
-    Write-Host ""
-    if ($buildCmd) {
-        Write-Host "Build command: $buildCmd" -ForegroundColor Yellow
-        if (Get-Confirmation "Would you like to customize it?" $false) {
-            $buildCmd = Get-Input "Build command" $buildCmd
-        }
-    } else {
-        if (Get-Confirmation "Do you need a build step?" $false) {
-            $buildCmd = Get-Input "Build command" "npm run build"
-        }
-    }
+Write-Step "Step 4/5: Build Configuration"
 
-    # Deploy command
-    Write-Host ""
-    if ($deployCmd) {
-        Write-Host "Deploy command: $deployCmd" -ForegroundColor Yellow
-        if (Get-Confirmation "Would you like to customize it?" $false) {
-            $deployCmd = Get-Input "Deploy command" $deployCmd
-        }
+if ($buildCmd) {
+    Write-Host "Build command: $buildCmd" -ForegroundColor Yellow
+    if (Get-Confirmation "Would you like to customize it?" $false) {
+        $buildCmd = Get-Input "Build command" $buildCmd
+    }
+} else {
+    if (Get-Confirmation "Do you need a build step?" $false) {
+        $buildCmd = Get-Input "Build command" "npm run build"
     }
 }
 
-# Save config
-Write-Step "Step 4/4: Saving Configuration"
+# Generate and save config
+Write-Step "Step 5/5: Saving Configuration"
 
-$config = New-Config -Platform $platform -AppUrl $appUrl -StagingUrl $stagingUrl -BuildCmd $buildCmd -DeployCmd $deployCmd -StagingDeployCmd $stagingDeployCmd
+if ($script:SelectedPlatforms.Count -eq 1) {
+    # Single destination - check for staging
+    $defaults = Get-PlatformDefaults $script:SelectedPlatforms[0]
+    Write-Host ""
+    if (Get-Confirmation "Do you have a staging environment?" $false) {
+        if ($defaults.StagingUrl) {
+            Write-Host ""
+            Write-Host "Example: $($defaults.StagingUrl)"
+        }
+        $stagingUrl = Get-Input "Staging URL" $defaults.StagingUrl
+        $config = New-SingleConfig -AppUrl $script:VerifyUrls[0] -StagingUrl $stagingUrl -BuildCmd $buildCmd -DeployCmd $script:DeployCommands[0] -StagingDeployCmd $defaults.StagingDeploy
+    } else {
+        $config = New-SingleConfig -AppUrl $script:VerifyUrls[0] -StagingUrl "none" -BuildCmd $buildCmd -DeployCmd $script:DeployCommands[0] -StagingDeployCmd ""
+    }
+} else {
+    # Multi-destination
+    $config = New-MultiConfig -BuildCmd $buildCmd
+}
+
 Set-Content -Path $ConfigFile -Value $config -Encoding UTF8
-
 Write-Host "  Configuration saved to: $ConfigFile" -ForegroundColor Green
 
 # Summary
@@ -387,20 +540,19 @@ Write-Host "  Skill:  $SkillsDir\ship.md"
 Write-Host "  Config: $ConfigFile"
 Write-Host ""
 Write-Host "Your configuration:" -ForegroundColor White
-Write-Host "  Platform: $platform"
-if ($appUrl) {
-    Write-Host "  URL: $appUrl"
-}
-if ($stagingUrl -and $stagingUrl -ne "none") {
-    Write-Host "  Staging: $stagingUrl"
+if ($script:SelectedPlatforms.Count -eq 1) {
+    Write-Host "  Platform: $($script:SelectedPlatforms[0])"
+    Write-Host "  URL: $($script:VerifyUrls[0])"
+} else {
+    Write-Host "  Destinations:"
+    for ($i = 0; $i -lt $script:SelectedPlatforms.Count; $i++) {
+        Write-Host "    * $($script:SelectedPlatforms[$i]): $($script:VerifyUrls[$i])"
+    }
 }
 Write-Host ""
 Write-Host "Usage:" -ForegroundColor White
 Write-Host '  /ship                    # Auto commit, push, build, deploy'
 Write-Host '  /ship "feat: feature"    # Custom commit message'
-if ($stagingUrl -and $stagingUrl -ne "none") {
-    Write-Host '  /ship --env=staging      # Deploy to staging'
-}
 Write-Host '  /ship --dry-run          # Preview without executing'
 Write-Host '  /ship --no-deploy        # Commit and push only'
 Write-Host ""
