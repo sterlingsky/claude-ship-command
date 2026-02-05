@@ -42,12 +42,12 @@ A powerful `/ship` skill for [Claude Code](https://claude.ai/claude-code) that a
 
 **Mac / Linux:**
 ```bash
-curl -fsSL https://raw.githubusercontent.com/YOUR_USERNAME/claude-ship-command/main/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/Sterling-Sky/claude-ship-command/main/install.sh | bash
 ```
 
 **Windows (PowerShell as Administrator):**
 ```powershell
-irm https://raw.githubusercontent.com/YOUR_USERNAME/claude-ship-command/main/install.ps1 | iex
+irm https://raw.githubusercontent.com/Sterling-Sky/claude-ship-command/main/install.ps1 | iex
 ```
 
 **Manual Installation:**
@@ -56,10 +56,10 @@ irm https://raw.githubusercontent.com/YOUR_USERNAME/claude-ship-command/main/ins
 mkdir -p ~/.claude/skills
 
 # Copy the skill file
-curl -o ~/.claude/skills/ship.md https://raw.githubusercontent.com/YOUR_USERNAME/claude-ship-command/main/ship.md
+curl -o ~/.claude/skills/ship.md https://raw.githubusercontent.com/Sterling-Sky/claude-ship-command/main/ship.md
 
 # Copy and customize the config (pick one from examples/ or use the default)
-curl -o ~/.claude/ship.config.json https://raw.githubusercontent.com/YOUR_USERNAME/claude-ship-command/main/examples/firebase.json
+curl -o ~/.claude/ship.config.json https://raw.githubusercontent.com/Sterling-Sky/claude-ship-command/main/examples/firebase.json
 ```
 
 ### Configuration

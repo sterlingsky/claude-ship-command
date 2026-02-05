@@ -7,7 +7,7 @@ $ErrorActionPreference = "Stop"
 $ClaudeDir = "$env:USERPROFILE\.claude"
 $SkillsDir = "$ClaudeDir\skills"
 $ConfigFile = "$ClaudeDir\ship.config.json"
-$RepoUrl = "https://raw.githubusercontent.com/YOUR_USERNAME/claude-ship-command/main"
+$RepoUrl = "https://raw.githubusercontent.com/Sterling-Sky/claude-ship-command/main"
 
 function Write-Header {
     Write-Host ""
