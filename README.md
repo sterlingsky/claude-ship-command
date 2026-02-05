@@ -16,6 +16,95 @@ A powerful `/ship` skill for [Claude Code](https://claude.ai/claude-code) that a
 - **Verification with retries**: Confirms deployment is live
 - **Cross-platform**: Mac, Windows, and Linux support
 - **Safe**: Stops immediately on errors, never deploys broken builds
+- **Interactive setup**: Guided installer asks simple questions to configure everything
+
+## Interactive Setup Experience
+
+Run the installer and answer a few questions — no manual config editing required:
+
+```
+╔════════════════════════════════════════════════════════════╗
+║        Claude Ship Command - Interactive Setup             ║
+╚════════════════════════════════════════════════════════════╝
+
+━━━ Step 1/4: Downloading ship.md ━━━
+
+✓ Downloaded ship.md to ~/.claude/skills/
+
+━━━ Step 2/4: Select Your Platform ━━━
+
+Which platform do you deploy to?
+
+  1) Firebase (Hosting + Functions)
+  2) Google Cloud Run
+  3) Vercel
+  4) Netlify
+  5) Cloudflare Pages
+  6) AWS Amplify
+  7) AWS S3 + CloudFront
+  8) Azure Static Web Apps
+  9) GitHub Pages
+  10) Docker + Kubernetes
+  11) Heroku
+  12) Fly.io
+  13) Railway
+  14) Render
+  15) Git only (no deploy)
+  16) Custom (I'll configure manually)
+
+Enter number (1-16): 1
+
+✓ Selected: Firebase (Hosting + Functions)
+
+━━━ Step 3/4: Configure Your URLs ━━━
+
+What is your production URL?
+Example: https://your-app.web.app
+Production URL [https://your-app.web.app]: https://myapp.web.app
+
+Do you have a staging environment? [y/N]: y
+
+Example: https://your-app-staging.web.app
+Staging URL [https://your-app-staging.web.app]: https://myapp-staging.web.app
+
+Build command: npm run build
+Would you like to customize it? [y/N]: n
+
+Deploy command: firebase deploy --only functions,hosting
+Would you like to customize it? [y/N]: n
+
+━━━ Step 4/4: Saving Configuration ━━━
+
+✓ Configuration saved to: ~/.claude/ship.config.json
+
+╔════════════════════════════════════════════════════════════╗
+║               Installation Complete!                        ║
+╚════════════════════════════════════════════════════════════╝
+
+Files installed:
+  Skill:  ~/.claude/skills/ship.md
+  Config: ~/.claude/ship.config.json
+
+Your configuration:
+  Platform: Firebase (Hosting + Functions)
+  URL: https://myapp.web.app
+  Staging: https://myapp-staging.web.app
+
+Usage:
+  /ship                    # Auto commit, push, build, deploy
+  /ship "feat: feature"    # Custom commit message
+  /ship --env=staging      # Deploy to staging
+  /ship --dry-run          # Preview without executing
+  /ship --no-deploy        # Commit and push only
+
+Open Claude Code and type /ship to get started!
+```
+
+The installer automatically:
+- Detects your platform and suggests appropriate commands
+- Pre-fills URLs with sensible defaults
+- Configures staging environments if needed
+- Sets up build and deploy commands for your platform
 
 ## Supported Cloud Destinations
 
