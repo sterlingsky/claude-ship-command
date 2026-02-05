@@ -1,0 +1,20 @@
+{
+  "$schema": "../ship.config.schema.json",
+  "_comment": "Git commit and push only - no build or deploy",
+  "build": {
+    "command": null,
+    "enabled": false
+  },
+  "deploy": {
+    "command": null,
+    "enabled": false
+  },
+  "verify": {
+    "url": null,
+    "enabled": false
+  },
+  "git": {
+    "addAll": true,
+    "pushUpstream": true
+  }
+}

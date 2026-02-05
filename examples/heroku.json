@@ -1,0 +1,30 @@
+{
+  "$schema": "../ship.config.schema.json",
+  "_comment": "Heroku deployment configuration",
+  "build": {
+    "command": null,
+    "enabled": false
+  },
+  "deploy": {
+    "command": "git push heroku HEAD:main",
+    "enabled": true
+  },
+  "verify": {
+    "url": "https://your-app.herokuapp.com/",
+    "enabled": true,
+    "retries": 5,
+    "retryDelay": 10
+  },
+  "environments": {
+    "production": {
+      "deploy": { "command": "git push heroku HEAD:main" },
+      "verify": { "url": "https://your-app.herokuapp.com/" },
+      "protectedBranches": ["main"]
+    },
+    "staging": {
+      "deploy": { "command": "git push heroku-staging HEAD:main" },
+      "verify": { "url": "https://your-app-staging.herokuapp.com/" }
+    }
+  },
+  "defaultEnvironment": "production"
+}

@@ -1,0 +1,30 @@
+{
+  "$schema": "../ship.config.schema.json",
+  "_comment": "Cloudflare Pages deployment configuration",
+  "build": {
+    "command": "npm run build",
+    "enabled": true
+  },
+  "deploy": {
+    "command": "wrangler pages deploy dist --project-name=your-app",
+    "enabled": true
+  },
+  "verify": {
+    "url": "https://your-app.pages.dev/",
+    "enabled": true,
+    "retries": 3,
+    "retryDelay": 5
+  },
+  "environments": {
+    "production": {
+      "deploy": { "command": "wrangler pages deploy dist --project-name=your-app --branch=main" },
+      "verify": { "url": "https://your-app.pages.dev/" },
+      "protectedBranches": ["main"]
+    },
+    "preview": {
+      "deploy": { "command": "wrangler pages deploy dist --project-name=your-app" },
+      "verify": { "url": null, "enabled": false }
+    }
+  },
+  "defaultEnvironment": "production"
+}

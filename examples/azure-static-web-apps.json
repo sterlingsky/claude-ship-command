@@ -1,0 +1,30 @@
+{
+  "$schema": "../ship.config.schema.json",
+  "_comment": "Azure Static Web Apps deployment configuration",
+  "build": {
+    "command": "npm run build",
+    "enabled": true
+  },
+  "deploy": {
+    "command": "swa deploy ./dist --deployment-token $SWA_TOKEN",
+    "enabled": true
+  },
+  "verify": {
+    "url": "https://your-app.azurestaticapps.net/",
+    "enabled": true,
+    "retries": 5,
+    "retryDelay": 10
+  },
+  "environments": {
+    "production": {
+      "deploy": { "command": "swa deploy ./dist --deployment-token $SWA_TOKEN --env production" },
+      "verify": { "url": "https://your-app.azurestaticapps.net/" },
+      "protectedBranches": ["main"]
+    },
+    "staging": {
+      "deploy": { "command": "swa deploy ./dist --deployment-token $SWA_TOKEN --env preview" },
+      "verify": { "url": null, "enabled": false }
+    }
+  },
+  "defaultEnvironment": "production"
+}

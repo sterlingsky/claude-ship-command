@@ -1,0 +1,30 @@
+{
+  "$schema": "../ship.config.schema.json",
+  "_comment": "Netlify deployment configuration",
+  "build": {
+    "command": "npm run build",
+    "enabled": true
+  },
+  "deploy": {
+    "command": "netlify deploy --prod --dir=dist",
+    "enabled": true
+  },
+  "verify": {
+    "url": "https://your-app.netlify.app/",
+    "enabled": true,
+    "retries": 3,
+    "retryDelay": 5
+  },
+  "environments": {
+    "production": {
+      "deploy": { "command": "netlify deploy --prod --dir=dist" },
+      "verify": { "url": "https://your-app.netlify.app/" },
+      "protectedBranches": ["main"]
+    },
+    "preview": {
+      "deploy": { "command": "netlify deploy --dir=dist" },
+      "verify": { "url": null, "enabled": false }
+    }
+  },
+  "defaultEnvironment": "production"
+}

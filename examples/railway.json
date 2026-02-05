@@ -1,0 +1,30 @@
+{
+  "$schema": "../ship.config.schema.json",
+  "_comment": "Railway.app deployment configuration",
+  "build": {
+    "command": null,
+    "enabled": false
+  },
+  "deploy": {
+    "command": "railway up",
+    "enabled": true
+  },
+  "verify": {
+    "url": "https://your-app.railway.app/",
+    "enabled": true,
+    "retries": 5,
+    "retryDelay": 10
+  },
+  "environments": {
+    "production": {
+      "deploy": { "command": "railway up --environment production" },
+      "verify": { "url": "https://your-app.railway.app/" },
+      "protectedBranches": ["main"]
+    },
+    "staging": {
+      "deploy": { "command": "railway up --environment staging" },
+      "verify": { "url": "https://your-app-staging.railway.app/" }
+    }
+  },
+  "defaultEnvironment": "production"
+}

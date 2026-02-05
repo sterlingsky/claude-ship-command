@@ -1,0 +1,34 @@
+{
+  "$schema": "../ship.config.schema.json",
+  "_comment": "AWS S3 + CloudFront static hosting configuration",
+  "build": {
+    "command": "npm run build",
+    "enabled": true
+  },
+  "deploy": {
+    "command": "aws s3 sync dist/ s3://your-bucket-name --delete && aws cloudfront create-invalidation --distribution-id YOUR_DIST_ID --paths '/*'",
+    "enabled": true
+  },
+  "verify": {
+    "url": "https://your-cloudfront-domain.cloudfront.net/",
+    "enabled": true,
+    "retries": 5,
+    "retryDelay": 10
+  },
+  "hooks": {
+    "preDeploy": "aws s3 ls s3://your-bucket-name > /dev/null 2>&1 || echo 'Bucket check failed'",
+    "postDeploy": null
+  },
+  "environments": {
+    "production": {
+      "deploy": { "command": "aws s3 sync dist/ s3://your-bucket-prod --delete && aws cloudfront create-invalidation --distribution-id PROD_DIST_ID --paths '/*'" },
+      "verify": { "url": "https://www.yourdomain.com/" },
+      "protectedBranches": ["main"]
+    },
+    "staging": {
+      "deploy": { "command": "aws s3 sync dist/ s3://your-bucket-staging --delete && aws cloudfront create-invalidation --distribution-id STAGING_DIST_ID --paths '/*'" },
+      "verify": { "url": "https://staging.yourdomain.com/" }
+    }
+  },
+  "defaultEnvironment": "production"
+}

@@ -1,0 +1,30 @@
+{
+  "$schema": "../ship.config.schema.json",
+  "_comment": "Vercel deployment configuration",
+  "build": {
+    "command": "npm run build",
+    "enabled": true
+  },
+  "deploy": {
+    "command": "vercel --prod",
+    "enabled": true
+  },
+  "verify": {
+    "url": "https://your-app.vercel.app/",
+    "enabled": true,
+    "retries": 3,
+    "retryDelay": 5
+  },
+  "environments": {
+    "production": {
+      "deploy": { "command": "vercel --prod" },
+      "verify": { "url": "https://your-app.vercel.app/" },
+      "protectedBranches": ["main"]
+    },
+    "preview": {
+      "deploy": { "command": "vercel" },
+      "verify": { "url": null, "enabled": false }
+    }
+  },
+  "defaultEnvironment": "production"
+}

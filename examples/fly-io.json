@@ -1,0 +1,30 @@
+{
+  "$schema": "../ship.config.schema.json",
+  "_comment": "Fly.io deployment configuration",
+  "build": {
+    "command": null,
+    "enabled": false
+  },
+  "deploy": {
+    "command": "fly deploy --ha=false",
+    "enabled": true
+  },
+  "verify": {
+    "url": "https://your-app.fly.dev/",
+    "enabled": true,
+    "retries": 5,
+    "retryDelay": 5
+  },
+  "environments": {
+    "production": {
+      "deploy": { "command": "fly deploy --ha=false" },
+      "verify": { "url": "https://your-app.fly.dev/" },
+      "protectedBranches": ["main"]
+    },
+    "staging": {
+      "deploy": { "command": "fly deploy --app your-app-staging --ha=false" },
+      "verify": { "url": "https://your-app-staging.fly.dev/" }
+    }
+  },
+  "defaultEnvironment": "production"
+}

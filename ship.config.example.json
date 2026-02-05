@@ -1,0 +1,38 @@
+{
+  "build": {
+    "command": "npm run build",
+    "enabled": true
+  },
+  "deploy": {
+    "command": "firebase deploy --only functions,hosting",
+    "enabled": true
+  },
+  "verify": {
+    "url": "https://your-app.web.app/",
+    "enabled": true,
+    "retries": 3,
+    "retryDelay": 5
+  },
+  "git": {
+    "addAll": true,
+    "pushUpstream": true
+  },
+  "hooks": {
+    "preBuild": null,
+    "postBuild": null,
+    "preDeploy": null,
+    "postDeploy": null
+  },
+  "environments": {
+    "production": {
+      "deploy": { "command": "firebase deploy --only functions,hosting" },
+      "verify": { "url": "https://your-app.web.app/" },
+      "protectedBranches": ["main", "master"]
+    },
+    "staging": {
+      "deploy": { "command": "firebase deploy --only functions,hosting --project staging" },
+      "verify": { "url": "https://staging.your-app.web.app/" }
+    }
+  },
+  "defaultEnvironment": "production"
+}

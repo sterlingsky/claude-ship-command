@@ -1,0 +1,26 @@
+{
+  "$schema": "../ship.config.schema.json",
+  "_comment": "Render.com deployment configuration (auto-deploys from git, manual trigger via API)",
+  "build": {
+    "command": "npm run build",
+    "enabled": true
+  },
+  "deploy": {
+    "command": "curl -X POST https://api.render.com/v1/services/$RENDER_SERVICE_ID/deploys -H 'Authorization: Bearer $RENDER_API_KEY'",
+    "enabled": true
+  },
+  "verify": {
+    "url": "https://your-app.onrender.com/",
+    "enabled": true,
+    "retries": 10,
+    "retryDelay": 15
+  },
+  "environments": {
+    "production": {
+      "deploy": { "command": "curl -X POST https://api.render.com/v1/services/$RENDER_PROD_SERVICE_ID/deploys -H 'Authorization: Bearer $RENDER_API_KEY'" },
+      "verify": { "url": "https://your-app.onrender.com/" },
+      "protectedBranches": ["main"]
+    }
+  },
+  "defaultEnvironment": "production"
+}

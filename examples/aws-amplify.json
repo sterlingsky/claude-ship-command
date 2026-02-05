@@ -1,0 +1,30 @@
+{
+  "$schema": "../ship.config.schema.json",
+  "_comment": "AWS Amplify deployment configuration",
+  "build": {
+    "command": "npm run build",
+    "enabled": true
+  },
+  "deploy": {
+    "command": "amplify publish --yes",
+    "enabled": true
+  },
+  "verify": {
+    "url": "https://main.your-app-id.amplifyapp.com/",
+    "enabled": true,
+    "retries": 5,
+    "retryDelay": 10
+  },
+  "environments": {
+    "production": {
+      "deploy": { "command": "amplify publish --yes" },
+      "verify": { "url": "https://main.your-app-id.amplifyapp.com/" },
+      "protectedBranches": ["main"]
+    },
+    "dev": {
+      "deploy": { "command": "amplify publish --yes --envName dev" },
+      "verify": { "url": "https://dev.your-app-id.amplifyapp.com/" }
+    }
+  },
+  "defaultEnvironment": "production"
+}
