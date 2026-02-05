@@ -18,7 +18,7 @@ NC='\033[0m'
 CLAUDE_DIR="$HOME/.claude"
 SKILLS_DIR="$CLAUDE_DIR/skills"
 CONFIG_FILE="$CLAUDE_DIR/ship.config.json"
-REPO_URL="https://raw.githubusercontent.com/Sterling-Sky/claude-ship-command/main"
+REPO_URL="https://raw.githubusercontent.com/sterlingsky/claude-ship-command/main"
 
 print_header() {
     echo ""
